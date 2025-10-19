@@ -3,7 +3,7 @@
 #
 # Contém o procedimento DFT(float *x, float *X_real, float *X_imag, int N)
 #
-# Argumentos (conforme imagem):
+# Argumentos (conforme a questao):
 # a0: Endereço do vetor de entrada x[n]
 # a1: Endereço do vetor de saída X_real[k]
 # a2: Endereço do vetor de saída X_imag[k]
@@ -24,8 +24,7 @@ C_ZERO:     .float 0.0
 # void DFT(a0: *x, a1: *X_real, a2: *X_imag, a3: N)
 # --------------------------------
 DFT:
-    # --- Prólogo: Salvar registradores ---
-    # Precisamos salvar:
+    # Salvar registradores
     # ra (return address)
     # s0-s5 (loop counters, N, ponteiros base)
     # fs0-fs2 (somas parciais, constante 2*pi/N)
@@ -41,52 +40,49 @@ DFT:
     fsw     fs1, 12(sp)       # Salva fs1 (usado para sum_imag)
     fsw     fs2, 8(sp)        # Salva fs2 (usado para (2*pi)/N )
 
-    # --- Inicialização ---
+    # Inicialização
     mv      s0, a0            # s0 = *x
     mv      s1, a1            # s1 = *X_real
     mv      s2, a2            # s2 = *X_imag
     mv      s3, a3            # s3 = N
 
     # Calcular a constante (2 * pi) / N
-    la      t0, C_TWO_PI
-    flw     ft0, 0(t0)        # ft0 = 2 * pi
-    fcvt.s.w ft1, s3           # ft1 = float(N)
-    fdiv.s  fs2, ft0, ft1     # fs2 = (2*pi) / N  (Salvamos em fs2!)
+    la		t0, C_TWO_PI	# C_TWO_PI = 6.2831853
+    flw     	ft0, 0(t0)      # ft0 = 2 * pi
+    fcvt.s.w 	ft1, s3       	# ft1 = float(N)
+    fdiv.s  	fs2, ft0, ft1	# fs2 = (2*pi) / N
 
     # Carregar 0.0 para os acumuladores
     la      t0, C_ZERO
     flw     fs0, 0(t0)        # fs0 = sum_real (será 0.0)
     flw     fs1, 0(t0)        # fs1 = sum_imag (será 0.0)
 
-    # --- Loop Externo (k) ---
+    # Loop Externo (k)
     li      s4, 0             # k = 0
-L_OUTER_K:
-    # Condição: k < N ?
-    bge     s4, s3, L_OUTER_K_END
+
+LOOP_OUTER_K:
+    bge     s4, s3, LOOP_OUTER_K_END	# k < N ?
 
     # Reinicia as somas para este 'k'
     la      t0, C_ZERO
     flw     fs0, 0(t0)        # sum_real = 0.0
     flw     fs1, 0(t0)        # sum_imag = 0.0
 
-    # --- Loop Interno (n) ---
+    # Loop Interno (n)
     li      s5, 0             # n = 0
-L_INNER_N:
-    # Condição: n < N ?
-    bge     s5, s3, L_INNER_N_END
 
-    # Calcular o ângulo: theta = (2*pi/N) * n * k
-    fcvt.s.w ft3, s5           # ft3 = float(n)
-    fcvt.s.w ft4, s4           # ft4 = float(k)
+LOOP_INNER_N:
+    bge     s5, s3, LOOP_INNER_N_END	# n < N ?
+
+    # Calcular o ângulo: theta = (2*pi*n*k)/N
+    fcvt.s.w ft3, s5          # ft3 = float(n)
+    fcvt.s.w ft4, s4          # ft4 = float(k)
     fmul.s  ft5, fs2, ft3     # ft5 = (2*pi/N) * n
     fmul.s  fa0, ft5, ft4     # fa0 = theta (argumento para sincos)
 
     # Chamar sincos(theta)
-    # Entrada: fa0 = theta
-    # Saída:  fa0 = cos(theta), fa1 = sin(theta)
+    # Retorno: fa0 = cos(theta), fa1 = sin(theta))
     jal     ra, sincos
-
-    # (sincos retorna com fa0 = cos(theta), fa1 = sin(theta))
 
     # Pegar x[n]
     slli    t0, s5, 2         # t0 = n * 4 (offset)
@@ -106,8 +102,9 @@ L_INNER_N:
 
     # Fim do loop interno
     addi    s5, s5, 1         # n++
-    j       L_INNER_N
-L_INNER_N_END:
+    j       LOOP_INNER_N
+
+LOOP_INNER_N_END:
     # Loop interno (n) terminou
 
     # Armazenar os resultados X[k]
@@ -122,11 +119,12 @@ L_INNER_N_END:
 
     # Fim do loop externo
     addi    s4, s4, 1         # k++
-    j       L_OUTER_K
-L_OUTER_K_END:
+    j       LOOP_OUTER_K
+
+LOOP_OUTER_K_END:
     # Loop externo (k) terminou
 
-    # --- Epílogo: Restaurar registradores ---
+    # Restaurar registradores
     lw      ra, 44(sp)        # Restaura ra
     lw      s0, 40(sp)
     lw      s1, 36(sp)
